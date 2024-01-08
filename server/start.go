@@ -441,6 +441,7 @@ func startCmtNode(
 		signingKey,
 		proxy.NewLocalClientCreator(cmtApp),
 		genDoc,
+		rollnode.DefaultMetricsProvider(cfg.Instrumentation),
 		servercmtlog.CometLoggerWrapper{Logger: svrCtx.Logger},
 	)
 	if err != nil {

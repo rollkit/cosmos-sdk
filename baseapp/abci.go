@@ -1,6 +1,7 @@
 package baseapp
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -8,10 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"cosmossdk.io/math"
 	"github.com/cockroachdb/errors"
 	abci "github.com/cometbft/cometbft/abci/types"
 	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
-	"github.com/cosmos/gogoproto/proto"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
@@ -120,8 +121,36 @@ func (app *BaseApp) InitChain(req *abci.RequestInitChain) (*abci.ResponseInitCha
 		sort.Sort(abci.ValidatorUpdates(res.Validators))
 
 		for i := range res.Validators {
-			if !proto.Equal(&res.Validators[i], &req.Validators[i]) {
-				return nil, fmt.Errorf("genesisValidators[%d] != req.Validators[%d] ", i, i)
+			// Get the public key bytes for request and response validators at index i.
+			// NB: The *capacity* of tye PubKey.Sum uint8 byte slice is inconsistent
+			// between the request and response (33 and 32 bytes, respectively).
+			reqPubKey := req.Validators[i].PubKey.GetEd25519()
+			resPubKey := res.Validators[i].PubKey.GetEd25519()
+			if !bytes.Equal(resPubKey, reqPubKey) {
+				return nil, fmt.Errorf(
+					"genesis.json validator public key doesn't match after import; expected %x, got %x",
+					reqPubKey,
+					resPubKey,
+				)
+			}
+
+			// Divide the request validator's power by sdk.DefaultPowerReduction in order
+			// to compare against the response validator's power value, on equal terms.
+			// See: cosmos-sdk/x/staking/keeper/Keeper.ApplyAndReturnValidatorSetUpdates
+			// and cosmos-sdk/x/staking/types.PotentialConsensusPower.
+			req.Validators[i].Power = sdk.TokensToConsensusPower(
+				math.NewInt(req.Validators[i].Power),
+				sdk.DefaultPowerReduction,
+			)
+
+			genesisValidatorPower := req.Validators[i].Power
+			importedGenesisValidatorPower := res.Validators[i].Power
+			if genesisValidatorPower != importedGenesisValidatorPower {
+				return nil, fmt.Errorf(
+					"genesis.json validator power doesn't match after import; expected %d, got %d",
+					genesisValidatorPower,
+					importedGenesisValidatorPower,
+				)
 			}
 		}
 	}

@@ -428,18 +428,18 @@ func (app *BaseApp) PrepareProposal(req *abci.RequestPrepareProposal) (resp *abc
 		WithConsensusParams(app.GetConsensusParams(app.prepareProposalState.ctx)).
 		WithBlockGasMeter(app.getBlockGasMeter(app.prepareProposalState.ctx))
 
-	// defer func() {
-	// 	if err := recover(); err != nil {
-	// 		app.logger.Error(
-	// 			"panic recovered in PrepareProposal",
-	// 			"height", req.Height,
-	// 			"time", req.Time,
-	// 			"panic", err,
-	// 		)
+	defer func() {
+		if err := recover(); err != nil {
+			app.logger.Error(
+				"panic recovered in PrepareProposal",
+				"height", req.Height,
+				"time", req.Time,
+				"panic", err,
+			)
 
-	// 		resp = &abci.ResponsePrepareProposal{Txs: req.Txs}
-	// 	}
-	// }()
+			resp = &abci.ResponsePrepareProposal{Txs: req.Txs}
+		}
+	}()
 
 	resp, err = app.prepareProposal(app.prepareProposalState.ctx, req)
 	if err != nil {

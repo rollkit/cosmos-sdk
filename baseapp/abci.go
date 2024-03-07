@@ -121,6 +121,7 @@ func (app *BaseApp) InitChain(req *abci.RequestInitChain) (*abci.ResponseInitCha
 
 		for i := range res.Validators {
 			if !proto.Equal(&res.Validators[i], &req.Validators[i]) {
+				fmt.Println(res.Validators[i], req.Validators[i])
 				return nil, fmt.Errorf("genesisValidators[%d] != req.Validators[%d] ", i, i)
 			}
 		}
